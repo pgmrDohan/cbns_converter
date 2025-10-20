@@ -395,9 +395,7 @@
         let digits = clean.split("").map((d) => (d === "1" ? 1 : 0));
         if (order === "msb") digits = digits.reverse();
         const z = cbnsDigitsToGaussianInt(digits);
-        gaussOutput.textContent = `${z.re} ${
-          z.im >= 0 ? __STRING_0_41__ : __STRING_0_42__
-        } ${Math.abs(z.im)}i`;
+        gaussOutput.textContent = `${z.re} ${z.im >=0 ? '+' : '-'} ${Math.abs(z.im)}i`;
       });
       document
         .getElementById("to-gauss-copy")
