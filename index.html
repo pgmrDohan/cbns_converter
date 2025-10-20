@@ -1,278 +1,466 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gaussian ⇄ CBNS Converter</title>
-  <style>
-    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#60a5fa;--glass: rgba(255,255,255,0.03)}
-    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,system-ui,-apple-system,Helvetica,Arial}
-    body{background:linear-gradient(180deg,#081226 0%, #061025 100%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:24px}
-    .card{width:100%;max-width:980px;background:var(--card);border-radius:14px;padding:20px;box-shadow:0 8px 30px rgba(2,6,23,0.6);backdrop-filter:blur(6px)}
-    header{display:flex;align-items:center;gap:12px}
-    h1{margin:0;font-size:20px}
-    p.lead{margin:6px 0 16px;color:var(--muted);font-size:13px}
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    input[type=text], input[type=number], textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:inherit;font-size:14px}
-    textarea{min-height:120px;resize:vertical}
-    .row{display:flex;gap:8px;align-items:center}
-    button{background:linear-gradient(180deg,var(--accent),#2b6cb0);border:0;padding:10px 12px;border-radius:10px;color:#fff;cursor:pointer}
-    .muted{color:var(--muted);font-size:13px}
-    .result{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-    .examples{display:flex;gap:8px;flex-wrap:wrap}
-    .chip{padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.03);cursor:pointer;border:1px solid rgba(255,255,255,0.02);font-size:13px}
-    footer{margin-top:14px;color:var(--muted);font-size:13px}
-    @media (max-width:800px){.grid{grid-template-columns:1fr}.card{margin-top: 100px;}}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <header>
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="22" height="22" rx="5" stroke="#3b82f6" stroke-width="1.2"/><path d="M8 13c2.5 0 7-6 9-6" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div style="flex:1">
-        <h1>Gaussian ⇄ CBNS Converter</h1>
-        <p class="lead">Convert Gaussian integers (a + bi) to CBNS digits (least-significant-bit first) and back. Paste digits or numbers and click a button.</p>
-      </div>
-    </header>
-
-    <div class="grid" style="margin-top:10px">
-      <!-- Left: Gaussian input -->
-      <div>
-        <label>Gaussian integer — quick parse</label>
-        <div class="row" style="gap:10px">
-          <input id="gauss-text" type="text" placeholder="Examples: 3+2i, -4-5i, 7, 2i" />
-          <button id="parse-btn">Parse</button>
-        </div>
-        <div style="height:8px"></div>
-        <label>Or enter components</label>
-        <div class="row">
-          <input id="real" type="number" step="1" placeholder="Real (a)" />
-          <input id="imag" type="number" step="1" placeholder="Imag (b)" />
-        </div>
-        <div style="height:10px"></div>
-        <div class="row">
-          <button id="to-cbns">Convert → CBNS</button>
-          <button id="to-cbns-copy">Copy digits</button>
-        </div>
-
-        <div style="height:12px"></div>
-        <label>Output (CBNS digits)</label>
-        <div class="result" id="cbns-output">(not converted yet)</div>
-
-        <div style="height:12px"></div>
-        <label>Examples</label>
-        <div class="examples">
-          <div class="chip" data-re="1" data-im="0">1</div>
-          <div class="chip" data-re="0" data-im="1">i</div>
-          <div class="chip" data-re="3" data-im="2">3+2i</div>
-          <div class="chip" data-re="-4" data-im="7">-4+7i</div>
-          <div class="chip" data-re="0" data-im="0">0</div>
-        </div>
-      </div>
-
-      <!-- Right: CBNS input -->
-      <div>
-        <label>CBNS digits (0/1)</label>
-        <textarea id="cbns-input" placeholder="Enter digits like 10110 or 0. You can use spaces or commas."></textarea>
-        <div style="height:8px"></div>
-        <label class="muted">Input order</label>
-        <div class="row">
-          <label style="margin-right:6px"><input type="radio" name="order" value="lsb" checked /> LSB → MSB</label>
-          <label><input type="radio" name="order" value="msb" /> MSB → LSB</label>
-        </div>
-        <div style="height:10px"></div>
-        <div class="row">
-          <button id="to-gauss">Convert → Gaussian</button>
-          <button id="to-gauss-copy">Copy a+bi</button>
-        </div>
-
-        <div style="height:12px"></div>
-        <label>Output (Gaussian integer)</label>
-        <div class="result" id="gauss-output">(not converted yet)</div>
-
-        <div style="height:12px"></div>
-        <label class="muted">Notes</label>
-        <div class="muted">This uses 32-bit JS numbers and rounds real/imag inputs to integers. For very large integers consider using a BigInt version.</div>
-      </div>
-    </div>
-
-    <footer>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <div class="muted">Built-in parser accepts forms like <code>3+2i</code>, <code>-4-5i</code>, <code>7</code>, <code>2i</code>.</div>
-        <div style="display:flex;gap:8px">
-          <button id="clear-all">Clear</button>
-          <button id="download">Download HTML</button>
-        </div>
-      </div>
-    </footer>
-  </div>
-
-  <script>
-    // ------------------ Core conversion functions (JS) ------------------
-    function mod2(n){ return ((n % 2) + 2) % 2; }
-    function pyFloorDiv(n,d){ return Math.floor(n / d); }
-
-    function gaussianIntToCbns(re, im){
-      let a = Math.round(Number(re));
-      let b = Math.round(Number(im));
-      if (a === 0 && b === 0) return [0];
-      const digits = [];
-      while (!(a === 0 && b === 0)){
-        const r = mod2(a + b);
-        digits.push(r);
-        const newA = pyFloorDiv(b - a + r, 2);
-        const newB = pyFloorDiv(-(a + b - r), 2);
-        a = newA; b = newB;
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Gaussian ⇄ CBNS Converter</title>
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <style>
+      :root {
+        --bg: #0f1724;
+        --card: #0b1220;
+        --muted: #9aa4b2;
+        --accent: #60a5fa;
+        --glass: rgba(255, 255, 255, 0.03);
       }
-      return digits; // LSB-first
-    }
-
-    function cbnsDigitsToGaussianInt(digits /* array of 0/1 LSB-first or MSB-first depending on caller */){
-      let real = 0, imag = 0;
-      for (let i = digits.length - 1; i >= 0; --i){
-        const d = Number(digits[i]);
-        const prevReal = real, prevImag = imag;
-        real = -prevReal - prevImag + d;
-        imag = prevReal - prevImag;
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: Inter, Segoe UI, Roboto, system-ui, -apple-system,
+          Helvetica, Arial;
+        box-sizing: border-box;
       }
-      return { re: Math.trunc(real), im: Math.trunc(imag) };
-    }
-
-    // ------------------ Helpers & UI wiring ------------------
-    const el = id => document.getElementById(id);
-    const cbnsOutput = el('cbns-output');
-    const gaussOutput = el('gauss-output');
-
-    function formatDigits(digits){
-      // returns both LSB-first and MSB-first as strings
-      const lsb = digits.join('');
-      const msb = digits.slice().reverse().join('');
-      return { lsb, msb };
-    }
-
-    function parseComplexText(s){
-      s = String(s).trim();
-      if (s === '') return null;
-      // normalize: remove spaces
-      s = s.replace(/\s+/g,'');
-      // cases: a+bi, a-bi, bi, a
-      // handle forms like ``-2i``
-      const iIndex = s.indexOf('i');
-      if (iIndex === -1){
-        // no i => pure real
-        const a = Number(s);
-        if (Number.isFinite(a)) return { re: Math.round(a), im: 0 };
-        return null;
+      body {
+        background: linear-gradient(180deg, #081226 0%, #061025 100%);
+        color: #e6eef6;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 24px;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 24px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+        min-height: 100vh;
       }
-      // has i
-      // separate real and imag
-      // find last + or - before the i (but not at position 0)
-      let imagPart = '', realPart = '';
-      // remove trailing 'i'
-      const base = s.slice(0, iIndex);
-      if (base === '' || base === '+' || base === '-'){
-        imagPart = base + '1';
-        realPart = '0';
-      } else {
-        // find split
-        const m = base.match(/([+-]?\d+)([+-]\d+)?$/);
-        // fallback: try to split by last +/-
-        let splitIndex = Math.max(base.lastIndexOf('+', base.length-1), base.lastIndexOf('-', base.length-1));
-        if (splitIndex <= 0) {
-          // only imag, like 2i or -3i
-          imagPart = base;
-          realPart = '0';
-        } else {
-          realPart = base.slice(0, splitIndex);
-          imagPart = base.slice(splitIndex);
+      .card {
+        width: 100%;
+        max-width: 980px;
+        background: var(--card);
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+        backdrop-filter: blur(6px);
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      p.lead {
+        margin: 6px 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      input[type="text"],
+      input[type="number"],
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        background: var(--glass);
+        color: inherit;
+        font-size: 14px;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      button {
+        background: linear-gradient(180deg, var(--accent), #2b6cb0);
+        border: 0;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: #fff;
+        cursor: pointer;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .result {
+        background: rgba(255, 255, 255, 0.02);
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.03);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .examples {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        padding: 6px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.02);
+        font-size: 13px;
+      }
+      footer {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 800px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .card {
+          margin: 6px;
+          border-radius: 12px;
+          padding: 14px;
+          max-width: 100%;
+        }
+        header svg {
+          width: 32px;
+          height: 32px;
+        }
+        h1 {
+          font-size: 18px;
         }
       }
-      const a = Number(realPart || 0);
-      const b = Number(imagPart || 0);
-      if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-      return { re: Math.round(a), im: Math.round(b) };
-    }
-
-    function normalizeDigitsString(s){
-      // accept spaces, commas; keep only 0/1
-      return String(s).replace(/[^01]/g,'');
-    }
-
-    // buttons
-    document.getElementById('to-cbns').addEventListener('click', ()=>{
-      const realVal = el('real').value;
-      const imagVal = el('imag').value;
-      let re = realVal !== '' ? Number(realVal) : null;
-      let im = imagVal !== '' ? Number(imagVal) : null;
-      if (re === null || im === null){
-        const parsed = parseComplexText(el('gauss-text').value);
-        if (!parsed){ cbnsOutput.textContent = 'Cannot parse input.'; return; }
-        re = parsed.re; im = parsed.im;
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <header>
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <rect
+            x="1"
+            y="1"
+            width="22"
+            height="22"
+            rx="5"
+            stroke="#3b82f6"
+            stroke-width="1.2"
+          />
+          <path
+            d="M8 13c2.5 0 7-6 9-6"
+            stroke="#60a5fa"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <div style="flex: 1">
+          <h1>Gaussian ⇄ CBNS Converter</h1>
+          <p class="lead">
+            Convert Gaussian integers (a + bi) to CBNS digits
+            (least-significant-bit first) and back. Paste digits or numbers and
+            click a button.
+          </p>
+        </div>
+      </header>
+      <div class="grid" style="margin-top: 10px">
+        <div>
+          <label>Gaussian integer — quick parse</label>
+          <div class="row" style="gap: 10px">
+            <input
+              id="gauss-text"
+              type="text"
+              placeholder="Examples: 3+2i, -4-5i, 7, 2i"
+            />
+            <button id="parse-btn">Parse</button>
+          </div>
+          <div style="height: 8px"></div>
+          <label>Or enter components</label>
+          <div class="row">
+            <input id="real" type="number" step="1" placeholder="Real (a)" />
+            <input id="imag" type="number" step="1" placeholder="Imag (b)" />
+          </div>
+          <div style="height: 10px"></div>
+          <div class="row">
+            <button id="to-cbns">Convert → CBNS</button>
+            <button id="to-cbns-copy">Copy digits</button>
+          </div>
+          <div style="height: 12px"></div>
+          <label>Output (CBNS digits)</label>
+          <div class="result" id="cbns-output">(not converted yet)</div>
+          <div style="height: 12px"></div>
+          <label>Examples</label>
+          <div class="examples">
+            <div class="chip" data-re="1" data-im="0">1</div>
+            <div class="chip" data-re="0" data-im="1">i</div>
+            <div class="chip" data-re="3" data-im="2">3+2i</div>
+            <div class="chip" data-re="-4" data-im="7">-4+7i</div>
+            <div class="chip" data-re="0" data-im="0">0</div>
+          </div>
+        </div>
+        <div>
+          <label>CBNS digits (0/1)</label>
+          <textarea
+            id="cbns-input"
+            placeholder="Enter digits like 10110 or 0. You can use spaces or commas."
+          ></textarea>
+          <div style="height: 8px"></div>
+          <label class="muted">Input order</label>
+          <div class="row">
+            <label style="margin-right: 6px"
+              ><input type="radio" name="order" value="lsb" checked /> LSB →
+              MSB</label
+            >
+            <label
+              ><input type="radio" name="order" value="msb" /> MSB → LSB</label
+            >
+          </div>
+          <div style="height: 10px"></div>
+          <div class="row">
+            <button id="to-gauss">Convert → Gaussian</button>
+            <button id="to-gauss-copy">Copy a+bi</button>
+          </div>
+          <div style="height: 12px"></div>
+          <label>Output (Gaussian integer)</label>
+          <div class="result" id="gauss-output">(not converted yet)</div>
+          <div style="height: 12px"></div>
+          <label class="muted">Notes</label>
+          <div class="muted">
+            This uses 32-bit JS numbers and rounds real/imag inputs to integers.
+            For very large integers consider using a BigInt version.
+          </div>
+        </div>
+      </div>
+      <footer>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+          "
+        >
+          <div class="muted">
+            Built-in parser accepts forms like <code>3+2i</code>,
+            <code>-4-5i</code>, <code>7</code>, <code>2i</code>.
+          </div>
+          <div style="display: flex; gap: 8px">
+            <button id="clear-all">Clear</button>
+            <button id="download">Download HTML</button>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script>
+      function mod2(n) {
+        return ((n % 2) + 2) % 2;
       }
-      if (!Number.isFinite(re) || !Number.isFinite(im)){ cbnsOutput.textContent = 'Invalid numbers.'; return; }
-      const digits = gaussianIntToCbns(re, im);
-      const f = formatDigits(digits);
-      cbnsOutput.innerHTML = `<div><strong>LSB → MSB:</strong> <span class="muted">${f.lsb}</span></div><div style="margin-top:8px"><strong>MSB → LSB:</strong> <span class="muted">${f.msb}</span></div>`;
-    });
+      function floorDiv(n, d) {
+        return Math.floor(n / d);
+      }
+      function gaussianIntToCbns(re, im) {
+        let a = Math.round(Number(re));
+        let b = Math.round(Number(im));
+        if (a === 0 && b === 0) return [0];
+        const digits = [];
+        while (!(a === 0 && b === 0)) {
+          const r = mod2(a + b);
+          digits.push(r);
+          const newA = floorDiv(b - a + r, 2);
+          const newB = floorDiv(-(a + b - r), 2);
+          a = newA;
+          b = newB;
+        }
+        return digits;
+      }
+      function cbnsDigitsToGaussianInt(digits) {
+        let real = 0,
+          imag = 0;
+        for (let i = digits.length - 1; i >= 0; --i) {
+          const d = Number(digits[i]);
+          const prevReal = real,
+            prevImag = imag;
+          real = -prevReal - prevImag + d;
+          imag = prevReal - prevImag;
+        }
+        return { re: Math.trunc(real), im: Math.trunc(imag) };
+      }
+      const el = (id) => document.getElementById(id);
+      const cbnsOutput = el("cbns-output");
+      const gaussOutput = el("gauss-output");
+      function formatDigits(digits) {
+        const lsb = digits.join("");
+        const msb = digits.slice().reverse().join("");
+        return { lsb, msb };
+      }
+      function parseComplexText(s) {
+        s = String(s).trim();
+        if (s === "") return null;
+        s = s.replace(/\s+/g, "");
+        const iIndex = s.indexOf("i");
+        if (iIndex === -1) {
+          const a = Number(s);
+          if (Number.isFinite(a)) return { re: Math.round(a), im: 0 };
+          return null;
+        }
+        let imagPart = "",
+          realPart = "";
+        const base = s.slice(0, iIndex);
+        if (base === "" || base === "+" || base === "-") {
+          imagPart = base + "1";
+          realPart = "0";
+        } else {
+          const m = base.match(/([+-]?\d+)([+-]\d+)?$/);
+          let splitIndex = Math.max(
+            base.lastIndexOf("+", base.length - 1),
+            base.lastIndexOf("-", base.length - 1)
+          );
+          if (splitIndex <= 0) {
+            imagPart = base;
+            realPart = "0";
+          } else {
+            realPart = base.slice(0, splitIndex);
+            imagPart = base.slice(splitIndex);
+          }
+        }
+        const a = Number(realPart || 0);
+        const b = Number(imagPart || 0);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+        return { re: Math.round(a), im: Math.round(b) };
+      }
+      function normalizeDigitsString(s) {
+        return String(s).replace(/[^01]/g, "");
+      }
+      
+      document.getElementById("to-cbns").addEventListener("click", () => {
+        const realVal = el("real").value;
+        const imagVal = el("imag").value;
+        let re = realVal !== "" ? Number(realVal) : null;
+        let im = imagVal !== "" ? Number(imagVal) : null;
+        if (re === null || im === null) {
+          const parsed = parseComplexText(el("gauss-text").value);
+          if (!parsed) {
+            cbnsOutput.textContent = "Cannot parse input.";
+            return;
+          }
+          re = parsed.re;
+          im = parsed.im;
+        }
+        if (!Number.isFinite(re) || !Number.isFinite(im)) {
+          cbnsOutput.textContent = "Invalid numbers.";
+          return;
+        }
+        const digits = gaussianIntToCbns(re, im);
+        const f = formatDigits(digits);
+        cbnsOutput.innerHTML = `<div><strong>LSB → MSB:</strong> <span class=__STRING_1_176__>${f.lsb}</span></div><div style=__STRING_1_177__><strong>MSB → LSB:</strong> <span class=__STRING_1_178__>${f.msb}</span></div>`;
+      });
+      document
+        .getElementById("to-cbns-copy")
+        .addEventListener("click", async () => {
+          const tmp = cbnsOutput.textContent || "";
+          try {
+            await navigator.clipboard.writeText(tmp);
+            alert("Copied output to clipboard");
+          } catch (e) {
+            alert("Copy failed — select and copy manually.");
+          }
+        });
+      document.getElementById("to-gauss").addEventListener("click", () => {
+        const raw = el("cbns-input").value;
+        const clean = normalizeDigitsString(raw);
+        if (clean.length === 0) {
+          gaussOutput.textContent = "No digits found.";
+          return;
+        }
+        const order = document.querySelector(
+          'input[name="order"]:checked'
+        ).value;
+        let digits = clean.split("").map((d) => (d === "1" ? 1 : 0));
+        if (order === "msb") digits = digits.reverse(); // now digits is LSB-first
+        const z = cbnsDigitsToGaussianInt(digits);
+        gaussOutput.textContent = `${z.re} ${
+          z.im >= 0 ? __STRING_0_41__ : __STRING_0_42__
+        } ${Math.abs(z.im)}i`;
+      });
+      document
+        .getElementById("to-gauss-copy")
+        .addEventListener("click", async () => {
+          const txt = gaussOutput.textContent || "";
+          try {
+            await navigator.clipboard.writeText(txt);
+            alert("Copied a+bi to clipboard");
+          } catch (e) {
+            alert("Copy failed");
+          }
+        });
+      document.getElementById("parse-btn").addEventListener("click", () => {
+        const parsed = parseComplexText(el("gauss-text").value);
+        if (!parsed) {
+          alert("Could not parse");
+          return;
+        }
+        el("real").value = parsed.re;
+        el("imag").value = parsed.im;
+      });
+      document.querySelectorAll(".chip").forEach((c) =>
+        c.addEventListener("click", (ev) => {
+          const t = ev.currentTarget;
+          el("real").value = t.dataset.re;
+          el("imag").value = t.dataset.im;
+        })
+      );
+      document.getElementById("clear-all").addEventListener("click", () => {
+        el("gauss-text").value = "";
+        el("real").value = "";
+        el("imag").value = "";
+        el("cbns-input").value = "";
+        cbnsOutput.textContent = "(not converted yet)";
+        gaussOutput.textContent = "(not converted yet)";
+      });
 
-    document.getElementById('to-cbns-copy').addEventListener('click', async ()=>{
-      const tmp = cbnsOutput.textContent || '';
-      try{ await navigator.clipboard.writeText(tmp); alert('Copied output to clipboard'); }catch(e){ alert('Copy failed — select and copy manually.'); }
-    });
+      document.getElementById("download").addEventListener("click", () => {
+        const html = `<!doctype html>\n${document.documentElement.outerHTML}`;
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "cbns-converter.html";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
 
-    document.getElementById('to-gauss').addEventListener('click', ()=>{
-      const raw = el('cbns-input').value;
-      const clean = normalizeDigitsString(raw);
-      if (clean.length === 0){ gaussOutput.textContent = 'No digits found.'; return; }
-      // determine order
-      const order = document.querySelector('input[name="order"]:checked').value;
-      let digits = clean.split('').map(d=>d === '1' ? 1 : 0);
-      if (order === 'msb') digits = digits.reverse(); // now digits is LSB-first
-      const z = cbnsDigitsToGaussianInt(digits);
-      gaussOutput.textContent = `${z.re} ${z.im >=0 ? '+' : '-'} ${Math.abs(z.im)}i`;
-    });
+      el("cbns-input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          document.getElementById("to-gauss").click();
+        }
+      });
 
-    document.getElementById('to-gauss-copy').addEventListener('click', async ()=>{
-      const txt = gaussOutput.textContent || '';
-      try{ await navigator.clipboard.writeText(txt); alert('Copied a+bi to clipboard'); }catch(e){ alert('Copy failed'); }
-    });
-
-    document.getElementById('parse-btn').addEventListener('click', ()=>{
-      const parsed = parseComplexText(el('gauss-text').value);
-      if (!parsed) { alert('Could not parse'); return; }
-      el('real').value = parsed.re; el('imag').value = parsed.im;
-    });
-
-    document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', (ev)=>{
-      const t = ev.currentTarget;
-      el('real').value = t.dataset.re; el('imag').value = t.dataset.im;
-    }));
-
-    document.getElementById('clear-all').addEventListener('click', ()=>{
-      el('gauss-text').value = '';
-      el('real').value = '';
-      el('imag').value = '';
-      el('cbns-input').value = '';
-      cbnsOutput.textContent = '(not converted yet)';
-      gaussOutput.textContent = '(not converted yet)';
-    });
-
-    // Download HTML: generate a blob of this document
-    document.getElementById('download').addEventListener('click', ()=>{
-      const html = `<!doctype html>\n${document.documentElement.outerHTML}`;
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'cbns-converter.html'; document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    });
-
-    // small UX: update outputs when pressing Enter in cbns field
-    el('cbns-input').addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { document.getElementById('to-gauss').click(); } });
-
-    // initial demo
-    cbnsOutput.textContent = '(not converted yet)'; gaussOutput.textContent = '(not converted yet)';
-  </script>
-</body>
+      cbnsOutput.textContent = "(not converted yet)";
+      gaussOutput.textContent = "(not converted yet)";
+    </script>
+  </body>
 </html>
